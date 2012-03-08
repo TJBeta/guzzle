@@ -39,6 +39,7 @@ class Oauth2Plugin implements EventSubscriberInterface, \Serializable
      *     string 'auth_endpoint'   URL to initially ask for permission
      *     string 'token_endpoint'  URL (after permission granted) to exchange for permenant token
      *      array 'scope'           Scope of access to reqeust of user
+     *     string 'code'            (optional) The $code variable given from the provider - required if returning from authorization
      *     string 'redirect_uri'    (optional) Redirect URL from provider after authentication
      *     string 'state'           (optional) A string to prevent CSRF - plugin will generate a random string if not specified
      */
@@ -66,10 +67,31 @@ class Oauth2Plugin implements EventSubscriberInterface, \Serializable
      */
     public function onRequestBeforeSend(Event $event)
     {
-        // check expiration lifetime on token
-        // do refresh if necessary
+        if (null === $this->refreshToken) {
+            if (null === ($code = $this->config->get('code'))) {
+                // Authentication hasn't even been started!
+                throw new \Exception(); // will provide better Exception later
+            }
 
-        // attach oauth2 header(s) to request
+            $this->requestAuthToken($code);
+
+            // if no errors - save tokens to $this
+            // otherwise, exception all the things!
+        }
+
+        // if (refresh token has expired)
+            // $this->refreshAuthToken();
+
+        $event['request']->setHeader('Authorization', '' /*tokens!!! */);
+    }
+
+    /**
+     * Provides a URL to redirect the user to in order to approve the application with the provider
+     *
+     * @return string A full URL
+     */
+    public function getTokenRequestUrl()
+    {
     }
 
     /**
@@ -77,7 +99,7 @@ class Oauth2Plugin implements EventSubscriberInterface, \Serializable
      *
      * @param string $code Returned from the provider after successful authorization
      */
-    public function requestAuthToken($code)
+    protected function requestAuthToken($code)
     {
     }
 
