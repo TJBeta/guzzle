@@ -28,7 +28,12 @@ class Oauth2Plugin implements EventSubscriberInterface, \Serializable
     /**
      * @var string Refresh token aquired from provider
      */
-    protected $refreshToken;
+    protected $refreshToken = null;
+
+    /**
+     * @var string The all important token for providers
+     */
+    protected $accessToken = null;
 
     /**
      * Create a new OAuth2 plugin
@@ -38,16 +43,29 @@ class Oauth2Plugin implements EventSubscriberInterface, \Serializable
      *     string 'consumer_secret' OAuth application secret
      *     string 'auth_endpoint'   URL to initially ask for permission
      *     string 'token_endpoint'  URL (after permission granted) to exchange for permenant token
-     *      array 'scope'           Scope of access to reqeust of user
-     *     string 'code'            (optional) The $code variable given from the provider - required if returning from authorization
-     *     string 'redirect_uri'    (optional) Redirect URL from provider after authentication
-     *     string 'state'           (optional) A string to prevent CSRF - plugin will generate a random string if not specified
      */
     public function __construct($config)
     {
         $this->config = Inspector::prepareConfig($config, array(
-            'scope' => array()
+            'scope'         => array()
+          , 'code'          => ''
+          , 'redirect_uri'  => ''
+          , 'state'         => uniqid()
+          , 'response_type' => null
+          , 'grant_type'    => null
         ), array('consumer_key', 'consumer_secret', 'auth_endpoint', 'token_endpoint'));
+
+        if (null === $this->config->get('grant_type') && null === $this->config->get('response_type')) {
+            throw new \InvalidArgumnetException('Authorization grant type not specified. Please pass response_type or grant_type');
+        }
+    }
+
+    /**
+     * @return boolean
+     */
+    public function isAuthorized()
+    {
+        return !(null === $this->accessToken);
     }
 
     /**
@@ -67,6 +85,8 @@ class Oauth2Plugin implements EventSubscriberInterface, \Serializable
      */
     public function onRequestBeforeSend(Event $event)
     {
+        // All this is tailored to the Authorization Grant type - needs to be refactored to that class
+
         if (null === $this->refreshToken) {
             if (null === ($code = $this->config->get('code'))) {
                 // Authentication hasn't even been started!
@@ -108,6 +128,9 @@ class Oauth2Plugin implements EventSubscriberInterface, \Serializable
      */
     public function refreshAuthToken()
     {
+        if (null === $this->refreshToken) {
+            throw new \RuntimeException('A refresh token was not given by the provider');
+        }
     }
 
     /**
@@ -121,6 +144,7 @@ class Oauth2Plugin implements EventSubscriberInterface, \Serializable
             'config'  => $this->config
           , 'expires' => $this->tokenExpiration
           , 'refresh' => $this->refreshToken
+          , 'access'  => $this->accessToken
         ));
     }
 
@@ -134,5 +158,6 @@ class Oauth2Plugin implements EventSubscriberInterface, \Serializable
         $this->config          = $config;
         $this->tokenExpiration = $expires;
         $this->refreshToken    = $refresh;
+        $this->accessToken     = $access;
     }
 }
